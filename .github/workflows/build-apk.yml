@@ -20,41 +20,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 11
-        uses: actions/setup-java@v5
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '11'
+          java-version: '17'
+          cache: gradle
 
       - name: Find ZIP
         shell: bash
         run: |
           set -e
-
           ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
-
           if [ -z "$ZIP_FILE" ]; then
             echo "::error::No project ZIP file was found."
             exit 1
           fi
-
           echo "Found ZIP:"
           echo "$ZIP_FILE"
-
           echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
 
       - name: Extract project
         shell: bash
         run: |
           set -e
-
           mkdir -p project
-
           echo "Extracting:"
           echo "$ZIP_FILE"
-
           unzip -q "$ZIP_FILE" -d project
-
           echo "Extracted files:"
           find project -maxdepth 4 -type f | head -300
 
@@ -62,50 +55,36 @@ jobs:
         shell: bash
         run: |
           set -e
-
-          GRADLEW=$(find "$GITHUB_WORKSPACE/project" \
-            -type f \
-            -name "gradlew" \
-            | head -n 1)
-
+          GRADLEW=$(find "$GITHUB_WORKSPACE/project" -type f -name "gradlew" | head -n 1)
           if [ -z "$GRADLEW" ]; then
             echo "::error::gradlew was not found after extracting the ZIP."
             echo "Searching all files:"
             find project -maxdepth 6 -type f
             exit 1
           fi
-
           PROJECT_DIR=$(dirname "$GRADLEW")
-
           echo "Gradle wrapper:"
           echo "$GRADLEW"
-
           echo "Project directory:"
           echo "$PROJECT_DIR"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Check project
         shell: bash
         run: |
           set -e
-
           echo "Project:"
           ls -la "$PROJECT_DIR"
-
           echo ""
           echo "Gradle wrapper:"
           ls -la "$PROJECT_DIR/gradlew"
-
           echo ""
           echo "Gradle settings:"
-          ls -la "$PROJECT_DIR/settings.gradle" \
-                 "$PROJECT_DIR/settings.gradle.kts" 2>/dev/null || true
+          ls -la "$PROJECT_DIR/settings.gradle" "$PROJECT_DIR/settings.gradle.kts" 2>/dev/null || true
 
       - name: Make Gradle executable
         shell: bash
-        run: |
-          chmod +x "$PROJECT_DIR/gradlew"
+        run: chmod +x "$PROJECT_DIR/gradlew"
 
       - name: Check Gradle
         shell: bash
@@ -117,34 +96,19 @@ jobs:
         shell: bash
         run: |
           cd "$PROJECT_DIR"
-
-          ./gradlew assembleDebug \
-            --stacktrace \
-            --no-daemon \
-            --no-parallel
+          ./gradlew assembleDebug --stacktrace --no-daemon --no-parallel
 
       - name: Find APK
         shell: bash
         run: |
           set -e
-
           echo "Searching for APK..."
-
-          find "$GITHUB_WORKSPACE" \
-            -type f \
-            -name "*.apk" \
-            -print
-
-          APK=$(find "$GITHUB_WORKSPACE" \
-            -type f \
-            -name "*.apk" \
-            | head -n 1)
-
+          find "$GITHUB_WORKSPACE" -type f -name "*.apk" -print
+          APK=$(find "$GITHUB_WORKSPACE" -type f -name "*.apk" | head -n 1)
           if [ -z "$APK" ]; then
             echo "::error::APK was not generated."
             exit 1
           fi
-
           echo "APK found:"
           echo "$APK"
 
