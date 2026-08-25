@@ -39,21 +39,36 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      - name: Find and extract ZIP if present
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find "$GITHUB_WORKSPACE" -maxdepth 2 -type f -name "*.zip" | head -n 1)
+
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found ZIP in repo: $ZIP_FILE"
+            echo "Extracting it so the project files are available to Gradle..."
+            mkdir -p "$GITHUB_WORKSPACE/extracted"
+            unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/extracted"
+            echo "Extracted contents:"
+            find "$GITHUB_WORKSPACE/extracted" -maxdepth 3 -type f | head -100
+          else
+            echo "No ZIP file found in repo root — assuming project files are already checked out directly."
+          fi
+
       - name: Locate gradlew
         shell: bash
         run: |
           set -e
 
-          echo "Repository contents (top level):"
-          ls -la
-
-          GRADLEW=$(find "$GITHUB_WORKSPACE" -maxdepth 3 -type f -name "gradlew" | head -n 1)
+          echo "Searching for gradlew..."
+          GRADLEW=$(find "$GITHUB_WORKSPACE" -type f -name "gradlew" -not -path "*/node_modules/*" | head -n 1)
 
           if [ -z "$GRADLEW" ]; then
-            echo "::error::gradlew was not found anywhere in the repository."
-            echo "This means gradlew was never committed/pushed to GitHub, even though it exists in your local project."
-            echo "Check your repository on GitHub — 'gradlew' should sit at the repo root next to gradlew.bat and settings.gradle.kts."
-            echo "If it's missing there, re-add it with 'git add -f gradlew' and push again (web upload sometimes drops extensionless executable files)."
+            echo "::error::gradlew was not found anywhere in the repository or extracted ZIP."
+            echo "Repository top level:"
+            ls -la "$GITHUB_WORKSPACE"
             exit 1
           fi
 
@@ -70,9 +85,21 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.2.11394342
 
+      - name: Find APK
+        shell: bash
+        run: |
+          set -e
+          APK=$(find "$GITHUB_WORKSPACE" -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::APK was not generated."
+            exit 1
+          fi
+          echo "APK found: $APK"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: GTA-2.11-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          path: |
+            **/*.apk
           if-no-files-found: error
